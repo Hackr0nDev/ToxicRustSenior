@@ -1,6 +1,7 @@
 f = open("9-253.txt")
 count = 0
 k = 0
+
 for i in f:
     s = i.split()
     a = sorted([int(x) for x in s])
