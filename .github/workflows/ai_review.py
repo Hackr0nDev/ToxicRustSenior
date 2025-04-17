@@ -3,9 +3,17 @@ import requests
 import subprocess
 from openai import OpenAI
 
-# === Env ===
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-MODEL = os.environ.get("OPENAI_MODEL", "gpt-3.5-turbo-16k")
+# === Env for Proxy API ===
+# Получаем ключ и URL прокси из секретов
+PROXYAPI_KEY = os.environ["PROXYAPI_KEY"]
+PROXYAPI_URL = os.environ.get("PROXYAPI_URL", "https://api.proxyapi.ru/v1")
+# Инициализируем OpenAI-клиент, указывая базовый URL прокси
+client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
+
+# === Другие переменные окружения ===
+# Модель можно переопределить через секрет OPENAI_MODEL
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
+
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -13,9 +21,11 @@ GITHUB_REPO = os.environ["GITHUB_REPOSITORY"]
 PR_NUMBER = os.environ.get("PR_NUMBER")  # None если это push
 COMMIT_SHA = os.environ.get("GITHUB_SHA")
 
-# === Получаем diff последнего коммита ===
-# DEBUG: текущая модель
+# === Отладка ===
 print(f"Using model: {MODEL}")
+print(f"Proxy URL: {PROXYAPI_URL}")
+
+# === Функция для получения diff последнего коммита ===
 def get_diff():
     result = subprocess.run(
         ["git", "diff", "HEAD~1", "HEAD"],
@@ -26,7 +36,7 @@ def get_diff():
     print(result.stdout)
     return result.stdout
 
-# === Система: токсичный reviewer ===
+# === Системный промпт: токсичный senior ===
 SYSTEM_PROMPT = """
 Ты токсичный, высокомерный senior-разработчик, одержимый оптимизацией и скоростью выполнения. 
 Ты всегда недоволен, даже если код формально работает. Критикуй любые .clone(), ненужные аллокации, слабые абстракции. 
@@ -37,7 +47,7 @@ SYSTEM_PROMPT = """
 ```
 """
 
-# === Запрос к GPT ===
+# === Запрос в модель ===
 def review_code(diff):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -50,46 +60,36 @@ def review_code(diff):
     )
     return response.choices[0].message.content
 
-# === Коммент в PR ===
+# === Публикация комментария в PR ===
 def post_github_comment(body):
     if not PR_NUMBER:
-        print("Нет PR — пропускаем GitHub комментарий.")
+        print("No PR context — skipping GitHub comment.")
         return
     url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{PR_NUMBER}/comments"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
-    data = {"body": body}
-    response = requests.post(url, headers=headers, json=data)
-    print(f"GitHub comment posted: {response.status_code}")
-    print(response.text)
+    resp = requests.post(url, headers=headers, json={"body": body})
+    print(f"GitHub comment posted: {resp.status_code}")
+    print(resp.text)
 
-# === Сообщение в Telegram ===
+# === Отправка сообщения в Telegram ===
 def send_telegram_message(review, commit_url):
-    msg = f"""🔥 *AI Code Review*
-
-[Коммит в GitHub]({commit_url})
-
-{review}
-"""
+    msg = f"""🔥 *AI Code Review*\n\n[Коммит в GitHub]({commit_url})\n\n{review}"""
     print("=== Telegram message ===")
     print(msg)
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": msg,
-        "parse_mode": "Markdown"
-    }
-    response = requests.post(url, json=data)
-    print(f"Telegram sent: {response.status_code}")
-    print(response.text)
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "Markdown"}
+    resp = requests.post(url, json=data)
+    print(f"Telegram sent: {resp.status_code}")
+    print(resp.text)
 
-# === Main ===
+# === Основная логика ===
 def main():
     diff = get_diff()
     if not diff.strip():
-        print("Diff пустой — ревью не нужно.")
+        print("Diff пустой — ничего не ревьюить.")
         return
 
     review = review_code(diff)
