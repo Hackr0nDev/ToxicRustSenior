@@ -5,6 +5,7 @@ from openai import OpenAI
 
 # === Env ===
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")  # Используем gpt-4.1 по умолчанию
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -41,7 +42,7 @@ def review_code(diff):
         {"role": "user", "content": f"Вот diff кода:\n\n{diff}"}
     ]
     response = client.chat.completions.create(
-        model="gpt-4",
+        model=MODEL,
         messages=messages,
         temperature=0.7
     )
@@ -64,7 +65,7 @@ def post_github_comment(body):
 
 # === Сообщение в Telegram ===
 def send_telegram_message(review, commit_url):
-    msg = f"""\U0001F525 *AI Code Review*
+    msg = f"""🔥 *AI Code Review*
 
 [Коммит в GitHub]({commit_url})
 
