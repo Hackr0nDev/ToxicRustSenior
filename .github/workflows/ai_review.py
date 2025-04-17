@@ -8,10 +8,12 @@ from openai import OpenAI
 PROXYAPI_KEY = os.environ.get("PROXYAPI_KEY")
 if not PROXYAPI_KEY:
     raise RuntimeError("PROXYAPI_KEY is not set. Please add it to your GitHub Secrets.")
-# URL прокси с указанием провайдера (обязательно указывать /openai)
-PROXYAPI_URL = os.environ.get("PROXYAPI_URL")
-if not PROXYAPI_URL:
+# URL прокси (может быть с или без "/openai")
+raw_url = os.environ.get("PROXYAPI_URL")
+if not raw_url:
     raise RuntimeError("PROXYAPI_URL is not set. Please add it to your GitHub Secrets.")
+# Если забыли указать "/openai", дополняем автоматически
+PROXYAPI_URL = raw_url.rstrip("/") + "/openai"
 # Инициализируем OpenAI-клиент, указывая base_url
 client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
 
@@ -34,7 +36,7 @@ for var_name, var_value in [
     ("COMMIT_SHA", COMMIT_SHA)
 ]:
     if not var_value:
-        raise RuntimeError(f"{var_name} is not set. Please add it to GitHub Secrets.")
+        raise RuntimeError(f"{var_name} is not set. Please add it to your GitHub Secrets.")
 
 # === Debug Info ===
 print(f"Using model: {MODEL}")
@@ -91,7 +93,7 @@ def post_github_comment(body):
 
 # === Отправка сообщения в Telegram ===
 def send_telegram_message(review, commit_url):
-    msg = f"""🔥 *AI Code Review*\n\n[Коммит в GitHub]({commit_url})\n\n{review}"""
+    msg = f"🔥 *AI Code Review*\n\n[Коммит в GitHub]({commit_url})\n\n{review}"
     print("=== Telegram message ===")
     print(msg)
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
