@@ -19,6 +19,8 @@ def get_diff():
         stdout=subprocess.PIPE,
         text=True
     )
+    print("=== DIFF ===")
+    print(result.stdout)
     return result.stdout
 
 # === Система: токсичный reviewer ===
@@ -58,6 +60,7 @@ def post_github_comment(body):
     data = {"body": body}
     response = requests.post(url, headers=headers, json=data)
     print(f"GitHub comment posted: {response.status_code}")
+    print(response.text)
 
 # === Сообщение в Telegram ===
 def send_telegram_message(review, commit_url):
@@ -67,6 +70,8 @@ def send_telegram_message(review, commit_url):
 
 {review}
 """
+    print("=== Telegram message ===")
+    print(msg)
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -75,6 +80,7 @@ def send_telegram_message(review, commit_url):
     }
     response = requests.post(url, json=data)
     print(f"Telegram sent: {response.status_code}")
+    print(response.text)
 
 # === Main ===
 def main():
@@ -90,4 +96,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
