@@ -1,3 +1,4 @@
+# .github/workflows/review.yml
 name: AI Code Review
 
 on:
@@ -28,10 +29,19 @@ jobs:
       - name: Run AI code review
         run: python .github/workflows/ai_review.py
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Proxy API credentials
+          PROXYAPI_KEY: ${{ secrets.PROXYAPI_KEY }}
+          PROXYAPI_URL: ${{ secrets.PROXYAPI_URL }}       # e.g. https://api.proxyapi.ru/v1
+          
+          # OpenAI model (optional override)
+          OPENAI_MODEL:  ${{ secrets.OPENAI_MODEL }}      # default gpt-4.1
+
+          # Telegram & GitHub tokens
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+
+          # Context
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_SHA: ${{ github.sha }}
+          PR_NUMBER:         ${{ github.event.pull_request.number }}
+          GITHUB_SHA:        ${{ github.sha }}
