@@ -20,78 +20,98 @@ if not PROXYAPI_KEY:
 # === Инициализация клиента ===
 client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
 
-# === Чтение системного промпта из файла promt.txt ===
-try:
-    with open("promt.txt", encoding="utf-8") as f:
-        SYSTEM_PROMPT = f.read()
-except FileNotFoundError:
-    logger.error("promt.txt не найден — используем пустой промпт")
-    SYSTEM_PROMPT = ""
+# === Загрузка системного промпта ===
+# Попробуем узнать промпт из файла prompt.txt или из переменной окружения
+prompt_paths =  "promt.txt"
+SYSTEM_PROMPT = None
+for path in prompt_paths:
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            SYSTEM_PROMPT = f.read().strip()
+        logger.info(f"Loaded system prompt from {path}, length={len(SYSTEM_PROMPT)}")
+        break
+if not SYSTEM_PROMPT:
+    SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", "")
+    if SYSTEM_PROMPT:
+        logger.info(f"Loaded system prompt from OPENAI_SYSTEM_PROMPT, length={len(SYSTEM_PROMPT)}")
+    else:
+        logger.warning("System prompt is empty. Add prompt.txt or set OPENAI_SYSTEM_PROMPT to customize behavior.")
 
-# === Переменные окружения ===
+# === Чтение переменных окружения ===
 def get_env(var_name, default=None, required=False):
     value = os.getenv(var_name, default)
-    if required and value is None:
+    if required and not value:
         logger.error(f"Environment variable {var_name} is missing")
         raise RuntimeError(f"{var_name} is required but not set")
     return value
 
-MODEL          = get_env("OPENAI_MODEL", "gpt-4o-mini")
-TELEGRAM_TOKEN = get_env("TELEGRAM_BOT_TOKEN", required=True)
+MODEL            = get_env("OPENAI_MODEL", "gpt-4o-mini")
+TELEGRAM_TOKEN   = get_env("TELEGRAM_BOT_TOKEN", required=True)
 TELEGRAM_CHAT_ID = get_env("TELEGRAM_CHAT_ID", required=True)
-GITHUB_TOKEN   = get_env("GITHUB_TOKEN", None)
-GITHUB_REPO    = get_env("GITHUB_REPOSITORY", required=True)
-PR_NUMBER      = get_env("PR_NUMBER", None)
-GITHUB_SHA     = get_env("GITHUB_SHA", required=True)
+GITHUB_TOKEN     = get_env("GITHUB_TOKEN", None)
+GITHUB_REPO      = get_env("GITHUB_REPOSITORY", required=True)
+PR_NUMBER        = get_env("PR_NUMBER", None)
+GITHUB_SHA       = get_env("GITHUB_SHA", required=True)
 
-# === Чтение содержимого папки src ===
+# === Чтение исходного кода Rust ===
 def get_src_code() -> str:
-    code_parts = []
+    parts = []
     for root, _, files in os.walk("src"):
-        for name in sorted(files):
-            if name.endswith(".rs"):
-                path = os.path.join(root, name)
+        for file in sorted(files):
+            if file.endswith(".rs"):
+                path = os.path.join(root, file)
                 with open(path, encoding="utf-8") as f:
-                    content = f.read()
-                code_parts.append(f"// File: {path}\n{content}\n")
-    return "\n".join(code_parts)
+                    code = f.read()
+                parts.append(f"// File: {path}\n{code}\n")
+    return "\n".join(parts)
 
-# === Отправка кода на ревью ===
+# === Ревью кода через OpenAI ===
 def review_code(src_code: str) -> str:
+    messages = []
+    if SYSTEM_PROMPT:
+        messages.append({"role": "system", "content": SYSTEM_PROMPT})
+    messages.append({"role": "user", "content": f"Проанализируй всё содержимое папки src:\n\n{src_code}"})
+    logger.debug(f"Sending {len(messages)} messages to OpenAI")
+
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Проанализируй всё содержимое папки src:\n\n{src_code}"}
-        ],
+        messages=messages,
         temperature=0.3
     )
     return response.choices[0].message.content
 
-# === Отправка результатов в Telegram ===
+# === Отправка в Telegram ===
 def send_telegram(review: str) -> None:
     import requests
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": f"🔥 *AI Rust Review*\n\n{review}", "parse_mode": "Markdown"}
-    requests.post(url, json=data)
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": f"🔥 *AI Rust Review*\n\n{review}",
+        "parse_mode": "Markdown"
+    }
+    resp = requests.post(url, json=payload)
+    if resp.status_code != 200:
+        logger.error(f"Telegram API error: {resp.status_code} {resp.text}")
 
-# === Комментирование в GitHub ===
+# === Комментарий в GitHub ===
 def post_github_comment(body: str) -> None:
     if not PR_NUMBER or not GITHUB_TOKEN:
         return
     import requests
     url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{PR_NUMBER}/comments"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    requests.post(url, headers=headers, json={"body": body})
+    resp = requests.post(url, headers=headers, json={"body": body})
+    if resp.status_code >= 400:
+        logger.error(f"GitHub API error: {resp.status_code} {resp.text}")
 
-# === Запуск ===
+# === Основная функция ===
 def main() -> None:
     logger.info("=== AI Rust Review Start ===")
-    src_code = get_src_code()
-    if not src_code.strip():
-        logger.info("No Rust files found in src/ folder, exiting")
+    src = get_src_code()
+    if not src.strip():
+        logger.info("No Rust files found in src/. Exiting.")
         return
-    review = review_code(src_code)
+    review = review_code(src)
     send_telegram(review)
     post_github_comment(review)
 
