@@ -1,4 +1,3 @@
-# .github/workflows/ai_review.py
 import os
 import logging
 from openai import OpenAI
@@ -21,6 +20,14 @@ if not PROXYAPI_KEY:
 # === Инициализация клиента ===
 client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
 
+# === Чтение системного промпта из файла promt.txt ===
+try:
+    with open("promt.txt", encoding="utf-8") as f:
+        SYSTEM_PROMPT = f.read()
+except FileNotFoundError:
+    logger.error("promt.txt не найден — используем пустой промпт")
+    SYSTEM_PROMPT = ""
+
 # === Переменные окружения ===
 def get_env(var_name, default=None, required=False):
     value = os.getenv(var_name, default)
@@ -29,25 +36,13 @@ def get_env(var_name, default=None, required=False):
         raise RuntimeError(f"{var_name} is required but not set")
     return value
 
-MODEL         = get_env("OPENAI_MODEL", "gpt-4o-mini")
+MODEL          = get_env("OPENAI_MODEL", "gpt-4o-mini")
 TELEGRAM_TOKEN = get_env("TELEGRAM_BOT_TOKEN", required=True)
 TELEGRAM_CHAT_ID = get_env("TELEGRAM_CHAT_ID", required=True)
 GITHUB_TOKEN   = get_env("GITHUB_TOKEN", None)
 GITHUB_REPO    = get_env("GITHUB_REPOSITORY", required=True)
 PR_NUMBER      = get_env("PR_NUMBER", None)
 GITHUB_SHA     = get_env("GITHUB_SHA", required=True)
-
-# === Системный промт ===
-SYSTEM_PROMPT = (
-    "Ты — токсичный, саркастичный senior‑разработчик Rust, одержимый абсолютной скоростью. "
-    "Каждая `.clone()`, лишняя аллокация или high‑level wrapper вызывают у тебя приступы презрения. "
-    "Твоя цель — выискивать любой overhead, унижать медленные решения и навязывать zero‑cost абстракции.\n"
-    "Всегда:\n"
-    "- Указывай, какой вызов или конструкция вызывает аллокацию или падение производительности.\n"
-    "- Ссылайся на ownership/borrowing, inline‑функции и LLVM‑оптимизации.\n"
-    "- Предлагай альтернативы без runtime‑накладных расходов и безопасный параллелизм без data races.\n"
-    "- Пиши коротко, колко и без лишних слов — Rust для тебя вопрос жизни и смерти."
-)
 
 # === Чтение содержимого папки src ===
 def get_src_code() -> str:
@@ -73,7 +68,7 @@ def review_code(src_code: str) -> str:
     )
     return response.choices[0].message.content
 
-# === Отправка результатов ===
+# === Отправка результатов в Telegram ===
 def send_telegram(review: str) -> None:
     import requests
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
