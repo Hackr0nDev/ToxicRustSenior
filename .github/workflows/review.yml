@@ -2,18 +2,17 @@
 name: AI Code Review
 
 on:
+  push:
+    branches: ["**"]
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - "**"
 
 jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -21,27 +20,21 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install -r .github/workflows/requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install openai requests
 
-      - name: Fetch full git history
+      - name: Fetch full history
         run: git fetch --unshallow
 
-      - name: Run AI code review
+      - name: Run AI review
         run: python .github/workflows/ai_review.py
         env:
-          # Proxy API credentials
-          PROXYAPI_KEY: ${{ secrets.PROXYAPI_KEY }}
-          PROXYAPI_URL: ${{ secrets.PROXYAPI_URL }}       # e.g. https://api.proxyapi.ru/v1
-          
-          # OpenAI model (optional override)
-          OPENAI_MODEL:  ${{ secrets.OPENAI_MODEL }}      # default gpt-4.1
-
-          # Telegram & GitHub tokens
+          PROXYAPI_KEY:       ${{ secrets.PROXYAPI_KEY }}
+          OPENAI_MODEL:       ${{ secrets.OPENAI_MODEL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
-          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
-
-          # Context
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER:         ${{ github.event.pull_request.number }}
-          GITHUB_SHA:        ${{ github.sha }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY:  ${{ github.repository }}
+          PR_NUMBER:          ${{ github.event.pull_request.number }}
+          GITHUB_SHA:         ${{ github.sha }}

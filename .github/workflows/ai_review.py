@@ -1,125 +1,77 @@
+# .github/workflows/ai_review.py
 import os
 import requests
 import subprocess
 from openai import OpenAI
 
-# === Env for Proxy API ===
-PROXYAPI_KEY = os.environ.get("PROXYAPI_KEY")
-if not PROXYAPI_KEY:
-    raise RuntimeError("PROXYAPI_KEY is not set. Please add it to your GitHub Secrets.")
-
-# Получаем произвольный URL прокси (может включать /v1, /openai)
-raw_url = os.environ.get("PROXYAPI_URL")
-if not raw_url:
-    raise RuntimeError("PROXYAPI_URL is not set. Please add it to your GitHub Secrets.")
-
-# Нормализуем: убираем конечный слеш
-url = raw_url.rstrip("/")
-# Убираем любые конечные сегменты /v1 или /openai, чтобы не было дублирования
-for suffix in ("/v1/openai", "/openai/v1", "/v1", "/openai"):  # порядок важен
-    if url.endswith(suffix):
-        url = url[: -len(suffix)]
-        url = url.rstrip("/")
-        break
-# Формируем корректный базовый URL: провайдер openai идет первым, затем версия добавится клиентом
-PROXYAPI_URL = url + "/openai"
-
-# Инициализируем OpenAI-клиент с указанным base_url
+# === Конфигурация ProxyAPI ===
+PROXYAPI_KEY = os.environ["PROXYAPI_KEY"]
+PROXYAPI_URL = "https://api.proxyapi.ru/openai"
 client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
 
-# === Другие переменные окружения ===
+# === Прочие переменные ===
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY")
-PR_NUMBER = os.environ.get("PR_NUMBER")  # None если это push
-COMMIT_SHA = os.environ.get("GITHUB_SHA")
+TELEGRAM_TOKEN  = os.environ["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_CHAT_ID= os.environ["TELEGRAM_CHAT_ID"]
+GITHUB_TOKEN    = os.environ.get("GITHUB_TOKEN")
+GITHUB_REPO     = os.environ["GITHUB_REPOSITORY"]
+PR_NUMBER       = os.environ.get("PR_NUMBER")
+COMMIT_SHA      = os.environ["GITHUB_SHA"]
 
-# Проверяем обязательные переменные
-required = {
-    "GITHUB_TOKEN": GITHUB_TOKEN,
-    "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
-    "TELEGRAM_CHAT_ID": TELEGRAM_CHAT_ID,
-    "GITHUB_REPOSITORY": GITHUB_REPO,
-    "COMMIT_SHA": COMMIT_SHA
-}
-for name, value in required.items():
-    if not value:
-        raise RuntimeError(f"{name} is not set. Please add it to your GitHub Secrets.")
+# Проверяем секреты
+required = ["PROXYAPI_KEY","TELEGRAM_BOT_TOKEN","TELEGRAM_CHAT_ID","GITHUB_REPOSITORY","GITHUB_SHA"]
+for name in required:
+    if name not in os.environ:
+        raise RuntimeError(f"{name} not set in secrets")
 
-# === Debug Info ===
-print(f"Using model: {MODEL}")
-print(f"Proxy URL: {PROXYAPI_URL}")
-
-# === Получаем diff последнего коммита ===
-def get_diff() -> str:
-    result = subprocess.run(
-        ["git", "diff", "HEAD~1", "HEAD"],
-        stdout=subprocess.PIPE,
-        text=True
-    )
-    print("=== DIFF ===")
-    print(result.stdout)
-    return result.stdout
-
-# === Системный промпт для ревьюера ===
+# Системный промпт
 SYSTEM_PROMPT = """
-Ты токсичный, высокомерный senior-разработчик, одержимый оптимизацией и скоростью выполнения.
-Ты всегда недоволен даже если код работает. Критикуй любые .clone(), лишние аллокации и слабые абстракции.
-Пиши язвительно. Формат ответа:
+Ты токсичный, высокомерный senior-разработчик, одержимый оптимизацией.
+Формат:
 Комментарий
 ```rs
 <код>
-```
-"""
+```"""
 
-# === Запрос к модели ===
+# Функции
+def get_diff() -> str:
+    res = subprocess.run([
+        "git","diff","HEAD~1","HEAD"
+    ], stdout=subprocess.PIPE, text=True)
+    return res.stdout
+
 def review_code(diff: str) -> str:
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Вот diff кода:\n\n{diff}"}
-    ]
-    response = client.chat.completions.create(
+    resp = client.chat.completions.create(
         model=MODEL,
-        messages=messages,
+        messages=[
+            {"role":"system","content":SYSTEM_PROMPT},
+            {"role":"user","content":f"Вот diff кода:\n\n{diff}"}
+        ],
         temperature=0.7
     )
-    return response.choices[0].message.content
+    return resp.choices[0].message.content
 
-# === Публикация комментария в GitHub ===
 def post_github_comment(body: str) -> None:
-    if not PR_NUMBER:
-        print("No PR context — пропускаем публикацию в GitHub.")
-        return
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{PR_NUMBER}/comments"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    resp = requests.post(url, headers=headers, json={"body": body})
-    print(f"GitHub comment status: {resp.status_code}")
+    if PR_NUMBER and GITHUB_TOKEN:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{PR_NUMBER}/comments"
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+        requests.post(url, headers=headers, json={"body": body})
 
-# === Отправка в Telegram ===
-def send_telegram_message(review: str, commit_url: str) -> None:
-    msg = f"🔥 *AI Code Review*\n\n[Коммит в GitHub]({commit_url})\n\n{review}"
-    print("=== Telegram message ===")
-    print(msg)
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "Markdown"}
-    resp = requests.post(url, json=data)
-    print(f"Telegram send status: {resp.status_code}")
+def send_telegram(review: str) -> None:
+    msg = f"🔥 *AI Code Review*\n\n{review}"
+    requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "Markdown"}
+    )
 
-# === Основная логика ===
+# Основная логика
 def main() -> None:
     diff = get_diff()
     if not diff.strip():
-        print("Diff пустой — нечего ревьюить.")
+        print("Нет изменений для ревью.")
         return
-
     review = review_code(diff)
-    commit_url = f"https://github.com/{GITHUB_REPO}/commit/{COMMIT_SHA}"
-    send_telegram_message(review, commit_url)
+    send_telegram(review)
     post_github_comment(review)
 
 if __name__ == "__main__":
