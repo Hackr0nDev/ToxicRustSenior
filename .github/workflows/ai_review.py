@@ -4,16 +4,18 @@ import subprocess
 from openai import OpenAI
 
 # === Env for Proxy API ===
-# Получаем ключ и URL прокси из секретов
-PROXYAPI_KEY = os.environ["PROXYAPI_KEY"]
+# Получаем ключ прокси из секретов
+PROXYAPI_KEY = os.environ.get("PROXYAPI_KEY")
+if not PROXYAPI_KEY:
+    raise RuntimeError("PROXYAPI_KEY is not set. Please add it to your GitHub Secrets.")
+# Базовый URL прокси с версией /v1 (ProxyAPI добавляет путь)
 PROXYAPI_URL = os.environ.get("PROXYAPI_URL", "https://api.proxyapi.ru/v1")
-# Инициализируем OpenAI-клиент, указывая базовый URL прокси
-client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
+# Инициализируем OpenAI-клиент, указывая api_base
+client = OpenAI(api_key=PROXYAPI_KEY, api_base=PROXYAPI_URL)
 
 # === Другие переменные окружения ===
-# Модель можно переопределить через секрет OPENAI_MODEL
+# MODEL: читаем из переменной OPENAI_MODEL, по умолчанию gpt-4.1
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
-
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -21,11 +23,11 @@ GITHUB_REPO = os.environ["GITHUB_REPOSITORY"]
 PR_NUMBER = os.environ.get("PR_NUMBER")  # None если это push
 COMMIT_SHA = os.environ.get("GITHUB_SHA")
 
-# === Отладка ===
+# === Debug Info ===
 print(f"Using model: {MODEL}")
 print(f"Proxy URL: {PROXYAPI_URL}")
 
-# === Функция для получения diff последнего коммита ===
+# === Получаем diff последнего коммита ===
 def get_diff():
     result = subprocess.run(
         ["git", "diff", "HEAD~1", "HEAD"],
@@ -38,8 +40,8 @@ def get_diff():
 
 # === Системный промпт: токсичный senior ===
 SYSTEM_PROMPT = """
-Ты токсичный, высокомерный senior-разработчик, одержимый оптимизацией и скоростью выполнения. 
-Ты всегда недоволен, даже если код формально работает. Критикуй любые .clone(), ненужные аллокации, слабые абстракции. 
+Ты токсичный, высокомерный senior-разработчик, одержимый оптимизацией и скоростью выполнения.
+Ты всегда недоволен, даже если код формально работает. Критикуй любые .clone(), ненужные аллокации, слабые абстракции.
 Пиши язвительно. Используй формат:
 Комментарий
 ```rs
