@@ -8,9 +8,10 @@ from openai import OpenAI
 PROXYAPI_KEY = os.environ.get("PROXYAPI_KEY")
 if not PROXYAPI_KEY:
     raise RuntimeError("PROXYAPI_KEY is not set. Please add it to your GitHub Secrets.")
-# Базовый URL прокси (без /v1)
-PROXYAPI_URL = os.environ.get("PROXYAPI_URL", "https://api.proxyapi.ru")
-# SDK сам добавит путь /v1
+# Базовый URL прокси (указывать домен + идентификатор провайдера)
+# ProxyAPI требует указывать путь к провайдеру, например /openai
+PROXYAPI_URL = os.environ.get("PROXYAPI_URL", "https://api.proxyapi.ru/openai")
+# Инициализируем OpenAI-клиент, указывая base_url
 client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
 
 # === Другие переменные окружения ===
