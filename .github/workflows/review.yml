@@ -11,26 +11,27 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           pip install --upgrade pip
           pip install openai requests
 
-      - name: Fetch full history
+      - name: Fetch history
         run: git fetch --unshallow
 
       - name: Run AI review
         run: python .github/workflows/ai_review.py
         env:
           PROXYAPI_KEY:       ${{ secrets.PROXYAPI_KEY }}
+          # PROXYAPI_URL не нужен в секретах — прописан в коде
           OPENAI_MODEL:       ${{ secrets.OPENAI_MODEL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}

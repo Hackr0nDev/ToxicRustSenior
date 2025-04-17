@@ -90,44 +90,4 @@ if __name__ == "__main__":
     main()
 
 
-# .github/workflows/review.yml
-name: AI Code Review
 
-on:
-  push:
-    branches: ["**"]
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install deps
-        run: |
-          pip install --upgrade pip
-          pip install openai requests
-
-      - name: Fetch history
-        run: git fetch --unshallow
-
-      - name: Run AI review
-        run: python .github/workflows/ai_review.py
-        env:
-          PROXYAPI_KEY:       ${{ secrets.PROXYAPI_KEY }}
-          # PROXYAPI_URL не нужен в секретах — прописан в коде
-          OPENAI_MODEL:       ${{ secrets.OPENAI_MODEL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY:  ${{ github.repository }}
-          PR_NUMBER:          ${{ github.event.pull_request.number }}
-          GITHUB_SHA:         ${{ github.sha }}
