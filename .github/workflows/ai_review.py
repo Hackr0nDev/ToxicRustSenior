@@ -1,4 +1,3 @@
-```python
 # .github/workflows/ai_review.py
 import os
 import requests
@@ -136,6 +135,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-```
-
-*Добавлено максимальное количество отладочных логов для каждого шага: чтения окружения, выполнения Git-команды, вызова OpenAI, взаимодействия с GitHub и Telegram.*
