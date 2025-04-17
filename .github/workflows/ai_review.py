@@ -29,7 +29,7 @@ def get_env(var_name, default=None, required=False):
         raise RuntimeError(f"{var_name} is required but not set")
     return value
 
-MODEL       = get_env("OPENAI_MODEL", "gpt-4o-mini")
+MODEL         = get_env("OPENAI_MODEL", "gpt-4o-mini")
 TELEGRAM_TOKEN = get_env("TELEGRAM_BOT_TOKEN", required=True)
 TELEGRAM_CHAT_ID = get_env("TELEGRAM_CHAT_ID", required=True)
 GITHUB_TOKEN   = get_env("GITHUB_TOKEN", None)
@@ -77,9 +77,7 @@ def review_code(src_code: str) -> str:
 def send_telegram(review: str) -> None:
     import requests
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": f"🔥 *AI Rust Review*
-
-{review}", "parse_mode": "Markdown"}
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": f"🔥 *AI Rust Review*\n\n{review}", "parse_mode": "Markdown"}
     requests.post(url, json=data)
 
 # === Комментирование в GitHub ===
