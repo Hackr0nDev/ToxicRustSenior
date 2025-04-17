@@ -8,21 +8,33 @@ from openai import OpenAI
 PROXYAPI_KEY = os.environ.get("PROXYAPI_KEY")
 if not PROXYAPI_KEY:
     raise RuntimeError("PROXYAPI_KEY is not set. Please add it to your GitHub Secrets.")
-# Базовый URL прокси (указывать домен + идентификатор провайдера)
-# ProxyAPI требует указывать путь к провайдеру, например /openai
-PROXYAPI_URL = os.environ.get("PROXYAPI_URL", "https://api.proxyapi.ru/openai")
+# URL прокси с указанием провайдера (обязательно указывать /openai)
+PROXYAPI_URL = os.environ.get("PROXYAPI_URL")
+if not PROXYAPI_URL:
+    raise RuntimeError("PROXYAPI_URL is not set. Please add it to your GitHub Secrets.")
 # Инициализируем OpenAI-клиент, указывая base_url
 client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_URL)
 
 # === Другие переменные окружения ===
 # MODEL: читаем из переменной OPENAI_MODEL, по умолчанию gpt-4.1
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")
-GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
-TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-GITHUB_REPO = os.environ["GITHUB_REPOSITORY"]
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY")
 PR_NUMBER = os.environ.get("PR_NUMBER")  # None если это push
 COMMIT_SHA = os.environ.get("GITHUB_SHA")
+
+# Проверяем обязательные переменные
+for var_name, var_value in [
+    ("GITHUB_TOKEN", GITHUB_TOKEN),
+    ("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
+    ("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID),
+    ("GITHUB_REPO", GITHUB_REPO),
+    ("COMMIT_SHA", COMMIT_SHA)
+]:
+    if not var_value:
+        raise RuntimeError(f"{var_name} is not set. Please add it to GitHub Secrets.")
 
 # === Debug Info ===
 print(f"Using model: {MODEL}")
