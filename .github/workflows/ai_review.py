@@ -5,7 +5,7 @@ from openai import OpenAI
 
 # === Env ===
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1")  # Используем gpt-4.1 по умолчанию
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-3.5-turbo-16k") 
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
