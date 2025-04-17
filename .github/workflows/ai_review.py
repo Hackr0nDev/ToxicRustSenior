@@ -1,10 +1,10 @@
 import os
-import openai
 import requests
 import subprocess
+from openai import OpenAI
 
 # === Env ===
-openai.api_key = os.environ["OPENAI_API_KEY"]
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -40,12 +40,12 @@ def review_code(diff):
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"Вот diff кода:\n\n{diff}"}
     ]
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=messages,
         temperature=0.7
     )
-    return response['choices'][0]['message']['content']
+    return response.choices[0].message.content
 
 # === Коммент в PR ===
 def post_github_comment(body):
